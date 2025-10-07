@@ -300,6 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
         productoSeleccionado: null,
         carrito: [],
         categoriaSeleccionada: null, // 🍔 Nueva variable para filtro de categoría
+        usuarioId: localStorage.getItem('usuarioId') || 4, // 🧠 ID del usuario para ML (por defecto 4 para pruebas)
         csrfToken: document.querySelector("meta[name='_csrf']")?.getAttribute("content"),
         csrfHeader: document.querySelector("meta[name='_csrf_header']")?.getAttribute("content"),
         // Opciones de entrega y pago
@@ -333,7 +334,11 @@ document.addEventListener("DOMContentLoaded", () => {
             if (options.method === 'POST') {
                 headers[State.csrfHeader] = State.csrfToken;
             }
-            const response = await fetch(url, { ...options, headers });
+            const response = await fetch(url, { 
+                ...options, 
+                headers,
+                credentials: 'include' // ✅ Incluir cookies de sesión para autenticación
+            });
             if (!response.ok) {
                 const errorMsg = await response.text();
                 throw new Error(errorMsg || 'Error de red o del servidor.');
@@ -359,7 +364,12 @@ document.addEventListener("DOMContentLoaded", () => {
         // 🔥 NUEVAS FUNCIONES PARA PRODUCTOS POTENCIADOS
         getProductosPotenciados: () => Api._fetch('/api/productos-potenciados/activos'),
         getTiposPromocion: () => Api._fetch('/api/productos-potenciados/tipos-promocion'),
-        calcularCostoPotenciacion: (cantidad) => Api._fetch(`/api/productos-potenciados/costo/${cantidad}`)
+        calcularCostoPotenciacion: (cantidad) => Api._fetch(`/api/productos-potenciados/costo/${cantidad}`),
+        
+        // 🧠 NUEVAS FUNCIONES PARA MACHINE LEARNING
+        getRecomendacionesML: (usuarioId) => Api._fetch(`/api/ml-monitor/recomendaciones/${usuarioId}`),
+        getDashboardML: (usuarioId) => Api._fetch(`/api/ml-monitor/dashboard/${usuarioId}`),
+        getStatusML: () => Api._fetch('/api/ml-monitor/status')
     };
 
     // 🔔 Sistema de Notificaciones y Caché Inteligente
@@ -1650,6 +1660,309 @@ document.addEventListener("DOMContentLoaded", () => {
             return gradientes[tipoPromocion] || 'from-gray-500 to-gray-600';
         },
 
+        /**
+         * 🧠 OBTENER RECOMENDACIONES ML COMO DATOS (sin HTML)
+         */
+        async getRecomendacionesML() {
+            try {
+                console.log('🧠 Obteniendo recomendaciones ML (solo datos)...');
+                
+                // Obtener usuario ID
+                let usuarioId = null;
+                try {
+                    const userSession = await Api._fetch('/api/auth/current-user');
+                    if (userSession && userSession.authenticated && userSession.id) {
+                        usuarioId = userSession.id;
+                        console.log('✅ Usuario obtenido:', userSession.email, 'ID:', usuarioId);
+                    }
+                } catch (e) {
+                    console.log('⚠️ Error obteniendo usuario:', e.message);
+                }
+
+                if (!usuarioId) {
+                    console.log('⚠️ No hay usuario logueado, no se cargarán recomendaciones ML');
+                    return [];
+                }
+
+                console.log('🔍 Usuario ID detectado para ML:', usuarioId);
+
+                // Obtener recomendaciones del backend
+                const recomendaciones = await Api.getRecomendacionesML(usuarioId);
+                console.log('🧠 Recomendaciones ML recibidas:', recomendaciones);
+
+                return recomendaciones || [];
+                
+            } catch (error) {
+                console.error('❌ Error al obtener recomendaciones ML:', error);
+                return [];
+            }
+        },
+
+        /**
+         * 🧠 RECOMENDACIONES ML (Machine Learning Personalizada) - CON HTML
+         */
+        async getRecomendacionesMLHTML() {
+            try {
+                console.log('🧠 Obteniendo recomendaciones ML...');
+                
+                // 🔍 Obtener el ID del usuario actual de manera más robusta
+                let usuarioId = null;
+                
+                // NUEVO: Mapeo directo de usuarios especializados para ML
+                const usuariosEspecializados = {
+                    'bebidas@unieats.com': null,  // Se llenará dinámicamente
+                    'almuerzo@unieats.com': null  // Se llenará dinámicamente
+                };
+                
+                // 1. Intentar obtener usuario desde sesión actual (mejorado)
+                try {
+                    const userSession = await Api._fetch('/api/auth/current-user');
+                    if (userSession && userSession.authenticated && userSession.id) {
+                        usuarioId = userSession.id;
+                        console.log('✅ Usuario obtenido desde sesión autenticada:', userSession.email, 'ID:', usuarioId);
+                        // Guardar para uso futuro
+                        localStorage.setItem('usuarioId', usuarioId);
+                        State.usuarioId = usuarioId;
+                    } else {
+                        console.log('⚠️ Sesión no autenticada o sin ID:', userSession);
+                    }
+                } catch (e) {
+                    console.log('⚠️ Error obteniendo usuario de sesión:', e.message);
+                }
+                
+                // 2. Si no hay sesión, buscar usuarios especializados y usar uno para demo
+                if (!usuarioId) {
+                    try {
+                        const response = await fetch('/api/debug/usuarios-especializados');
+                        if (response.ok) {
+                            const data = await response.json();
+                            if (data.success && data.usuarios && data.usuarios.length > 0) {
+                                // Mapear usuarios especializados
+                                data.usuarios.forEach(user => {
+                                    usuariosEspecializados[user.correo] = user.id;
+                                });
+                                
+                                // Usar el primer usuario especializado para demo ML
+                                usuarioId = data.usuarios[0].id;
+                                console.log('🧪 Usando usuario especializado para demo ML:', data.usuarios[0].correo, 'ID:', usuarioId);
+                                console.log('📋 Usuarios especializados disponibles:', usuariosEspecializados);
+                                
+                                // Guardar para uso futuro
+                                localStorage.setItem('usuarioId', usuarioId);
+                                State.usuarioId = usuarioId;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('⚠️ Error obteniendo usuarios especializados:', e.message);
+                    }
+                }
+                
+                // 3. Intentar desde localStorage
+                if (!usuarioId) {
+                    usuarioId = localStorage.getItem('usuarioId') || localStorage.getItem('userId');
+                    if (usuarioId) {
+                        console.log('💾 Usuario ID obtenido desde localStorage:', usuarioId);
+                    }
+                }
+                
+                // 4. Intentar desde State
+                if (!usuarioId && State.usuarioId) {
+                    usuarioId = State.usuarioId;
+                    console.log('🔄 Usuario ID obtenido desde State:', usuarioId);
+                }
+                
+                // 5. Como último recurso, usar usuario por defecto pero mostrar advertencia
+                if (!usuarioId) {
+                    console.warn('⚠️ No se encontró usuario logueado, usando usuario por defecto para demo');
+                    usuarioId = 4; // Solo para demo
+                }
+                
+                console.log('🔍 Usuario ID detectado para ML:', usuarioId);
+                
+                if (!usuarioId) {
+                    console.log('⚠️ No hay usuario logueado, no se mostrarán recomendaciones ML');
+                    return '';
+                }
+
+                // Obtener recomendaciones del backend
+                const recomendaciones = await Api.getRecomendacionesML(usuarioId);
+                const dashboard = await Api.getDashboardML(usuarioId);
+                
+                console.log('🧠 Recomendaciones ML recibidas:', recomendaciones);
+                console.log('📊 Dashboard ML:', dashboard);
+                
+                // 🛡️ Validar que recomendaciones es un array
+                if (!Array.isArray(recomendaciones) || recomendaciones.length === 0) {
+                    console.log('⚠️ No hay recomendaciones válidas o está vacío');
+                    // Mostrar mensaje personalizado basado en el comportamiento del usuario
+                    const comportamiento = dashboard?.comportamiento || dashboard?.comportamientos || [];
+                    const tieneComportamiento = comportamiento.length > 0;
+                    
+                    return `
+                        <div class="mx-3 mb-4">
+                            <!-- Header ML sin recomendaciones -->
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-8 h-8 bg-gradient-to-r from-purple-600 via-blue-500 to-purple-600 rounded-full flex items-center justify-center animate-pulse">
+                                        <span class="text-white text-sm font-bold">🧠</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-sm font-black text-gray-900">🧠 INTELIGENCIA ARTIFICIAL</h2>
+                                        <p class="text-xs text-purple-600 font-bold">${tieneComportamiento ? '¡Aprendiendo de tus gustos!' : '¡Empieza a ordenar para recomendaciones!'}</p>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-purple-700 bg-purple-50 border border-purple-200 px-2 py-1 rounded-lg font-bold">
+                                    ${tieneComportamiento ? 'APRENDIENDO 🧠' : 'NUEVO 🆕'}
+                                </div>
+                            </div>
+                            
+                            <!-- Mensaje explicativo -->
+                            <div class="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-3">
+                                <div class="text-center">
+                                    <div class="text-2xl mb-2">${tieneComportamiento ? '🔍' : '🎯'}</div>
+                                    <h3 class="text-sm font-bold text-gray-800 mb-1">
+                                        ${tieneComportamiento ? 'Generando recomendaciones...' : '¡Descubre tu sabor favorito!'}
+                                    </h3>
+                                    <p class="text-xs text-gray-600">
+                                        ${tieneComportamiento ? 'Nuestro sistema está analizando tus preferencias para ofrecerte recomendaciones personalizadas.' : 'Realiza algunos pedidos y nuestro sistema de IA aprenderá tus gustos para recomendarte productos perfectos.'}
+                                    </p>
+                                    ${tieneComportamiento ? `
+                                        <div class="mt-2 text-xs text-purple-600">
+                                            <span class="font-bold">${comportamiento.length}</span> interacciones registradas
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Hay recomendaciones, mostrarlas
+                let recomendacionesCards = '';
+                try {
+                    recomendacionesCards = recomendaciones.slice(0, 5).map(recomendacion => {
+                        // 🔍 Manejar diferentes estructuras de datos
+                        const producto = recomendacion.producto || recomendacion;
+                        const score = recomendacion.score ? Math.round(recomendacion.score * 100) : 85; // Valor por defecto
+                        
+                        // 🛡️ Validaciones para evitar errores
+                        const productoId = producto.id || producto.productoId || 1;
+                        const nombreProducto = producto.nombreProducto || producto.nombre || 'Producto sin nombre';
+                        const nombreTienda = producto.nombreTienda || producto.tienda || 'Tienda';
+                        const precio = producto.precio || 0;
+                        const imagenProducto = producto.imagenProducto || producto.imagen || '/uploads/productos/default.jpg';
+                        
+                        console.log('🧠 Procesando recomendación:', { producto, score, productoId, nombreProducto });
+                        
+                        return `
+                            <div class="min-w-[140px] bg-white rounded-xl border border-purple-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer relative overflow-hidden ml-recommendation-card" 
+                                 data-action="navigate" data-view="detalleProducto" data-id="${productoId}">
+                                
+                                <!-- Badge de confianza ML -->
+                                <div class="absolute top-2 left-2 z-10">
+                                    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-1.5 py-0.5 rounded-full shadow-lg">
+                                        <p class="text-[8px] font-black">🧠 ${score}%</p>
+                                    </div>
+                                </div>
+                                
+                                <!-- Imagen del producto -->
+                                <div class="relative h-16 bg-gradient-to-br from-purple-50 to-blue-50">
+                                    <img src="${imagenProducto}" 
+                                         alt="${nombreProducto}" 
+                                         class="w-full h-full object-cover"
+                                         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjgwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxkZWZzPjxsaW5lYXJHcmFkaWVudCBpZD0iZyIgeDE9IjAlIiB5MT0iMCUiIHgyPSIxMDAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2Y5ZmFmYiIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VkZWVmMCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbGw9InVybCgjZykiLz48dGV4dCB4PSI1MCUiIHk9IjUwJSIgZG9taW5hbnQtYmFzZWxpbmU9ImNlbnRyYWwiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiNkMWQ1ZGIiPvCfjY+4jTwvdGV4dD48L3N2Zz4='">
+                                </div>
+                                
+                                <!-- Contenido del producto -->
+                                <div class="p-1.5">
+                                    <!-- Nombre del producto -->
+                                    <h3 class="font-bold text-gray-900 text-xs leading-tight line-clamp-1 mb-1 h-4">${nombreProducto}</h3>
+                                    
+                                    <!-- Tienda -->
+                                    <p class="text-gray-400 text-[9px] mb-1 truncate">${nombreTienda}</p>
+                                    
+                                    <!-- Precio -->
+                                    <div class="mb-1.5">
+                                        <span class="text-purple-600 font-black text-xs">$${this.formatNumberCompact(precio)}</span>
+                                    </div>
+                                    
+                                    <!-- Botón agregar discreto -->
+                                    <button onclick="event.stopPropagation(); Cart.addRapido(${productoId}); this.classList.add('animate-bounce')" 
+                                            class="w-full bg-green-600 text-white py-1 rounded-lg text-[10px] font-bold shadow-md hover:bg-green-700 transition-all duration-200">
+                                        AGREGAR
+                                    </button>
+                                </div>
+                                
+                                <!-- Indicador sutil de popularidad -->
+                                <div class="absolute top-2 right-2 bg-orange-500 text-white text-center py-1 px-2 rounded-full">
+                                    <span class="text-[8px] font-bold">POPULAR</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } catch (mapError) {
+                    console.error('❌ Error al procesar recomendaciones:', mapError);
+                    console.log('🔍 Estructura de recomendaciones:', recomendaciones);
+                    recomendacionesCards = `
+                        <div class="min-w-[140px] bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-center">
+                            <div class="text-2xl mb-2">⚠️</div>
+                            <p class="text-xs text-gray-600">Error procesando recomendaciones</p>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <div class="mx-3 mb-4">
+                        <!-- Header simple sin propaganda -->
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center gap-2">
+                                <div class="w-6 h-6 bg-gradient-to-r from-green-500 to-green-600 rounded-full flex items-center justify-center">
+                                    <span class="text-white text-xs">⭐</span>
+                                </div>
+                                <div>
+                                    <h2 class="text-sm font-bold text-gray-900">Destacados</h2>
+                                    <p class="text-xs text-gray-500">Productos populares</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Scroll horizontal de recomendaciones -->
+                        <div class="flex overflow-x-auto gap-3 pb-2 scrollbar-hide snap-x snap-mandatory">
+                            ${recomendacionesCards}
+                        </div>
+                        
+                        <!-- Estadísticas del dashboard (opcional) -->
+                        ${dashboard && dashboard.totalComportamientos > 0 ? `
+                            <div class="mt-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-2">
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-gray-600">Pedidos analizados:</span>
+                                    <span class="font-bold text-purple-600">${dashboard.totalComportamientos}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-xs">
+                                    <span class="text-gray-600">Precisión del modelo:</span>
+                                    <span class="font-bold text-blue-600">Alta 🎯</span>
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+                
+            } catch (error) {
+                console.error('❌ Error al obtener recomendaciones ML:', error);
+                return `
+                    <div class="mx-3 mb-4">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-xl p-3">
+                            <div class="text-center">
+                                <div class="text-2xl mb-2">🧠</div>
+                                <h3 class="text-sm font-bold text-gray-800 mb-1">Sistema ML Temporalmente No Disponible</h3>
+                                <p class="text-xs text-gray-600">Nuestro sistema de inteligencia artificial está actualizándose. ¡Vuelve pronto!</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        },
+
         // Pantalla de loading moderna
         getLoadingHTML(message = 'Cargando...') {
             return `
@@ -1766,12 +2079,49 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 switch (view) {
                     case 'inicio':
+                        // ✅ LIMPIAR CATEGORÍA SELECCIONADA AL NAVEGAR A INICIO
+                        State.categoriaSeleccionada = null;
                         Header.innerHTML = this.getHeaderHTML('inicio');
                         const tiendas = await Api.getTiendas();
                         let productos = await Api.getProductos();
                         
                         // 🔥 Cargar productos potenciados
                         const productosPotenciadosHTML = await this.getProductosPotenciadosHTML();
+                        
+                        // 🧠 Obtener recomendaciones ML para mostrar discretamente
+                        const recomendacionesML = await this.getRecomendacionesML();
+                        let recomendacionesMLHTML = '';
+                        
+                        // 🎯 CREAR SCROLL HORIZONTAL DISCRETO si hay recomendaciones
+                        if (recomendacionesML && recomendacionesML.length > 0) {
+                            const recomendacionesCards = recomendacionesML.map(rec => `
+                                <div class="min-w-[140px] max-w-[140px] bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden" 
+                                     onclick="window.Views.render('detalleProducto', { id: ${rec.productoId} })">
+                                    <div class="relative">
+                                        <img src="${rec.imagenProducto || '/images/placeholder.jpg'}" 
+                                             alt="${rec.nombreProducto}" 
+                                             class="w-full h-20 object-cover">
+                                    </div>
+                                    <div class="p-2">
+                                        <h3 class="text-xs font-semibold text-gray-800 mb-1 line-clamp-2">${rec.nombreProducto}</h3>
+                                        <p class="text-xs text-gray-500">${rec.nombreTienda}</p>
+                                        <p class="text-sm font-bold text-green-600">$${rec.precioProducto || 0}</p>
+                                    </div>
+                                </div>
+                            `).join('');
+                            
+                            recomendacionesMLHTML = `
+                                <div class="mx-3 mb-4">
+                                    <!-- Título discreto -->
+                                    <h3 class="text-sm font-medium text-gray-700 mb-2">Para ti</h3>
+                                    
+                                    <!-- Scroll horizontal -->
+                                    <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                                        ${recomendacionesCards}
+                                    </div>
+                                </div>
+                            `;
+                        }
                         
                         // 🍔 FILTRAR POR CATEGORÍA SI HAY UNA SELECCIONADA
                         if (State.categoriaSeleccionada) {
@@ -1783,18 +2133,18 @@ document.addEventListener("DOMContentLoaded", () => {
                             console.log('📊 Productos filtrados encontrados:', productos.length);
                         }
                         
-                        // 🎯 NUEVA LÓGICA: Vista mejorada basada en popularidad con productos potenciados
+                        // 🎯 NUEVA LÓGICA: Vista mejorada basada en popularidad con productos potenciados y ML
                         if (State.categoriaSeleccionada) {
                             // Vista compacta cuando hay filtro de categoría
                             Container.innerHTML = 
                                 this.getCategoryBarHTML() +
                                 this.getCompactProductGridHTML(productos, State.categoriaSeleccionada);
                         } else {
-                            // � VISTA DE INICIO MEJORADA: Mostrar productos potenciados + categorías populares
+                            // ✨ VISTA DE INICIO: Productos organizados inteligentemente (ML integrado invisiblemente)
                             Container.innerHTML = 
                                 productosPotenciadosHTML +
                                 this.getCategoryBarHTML() +
-                                this.getPopularCategoriesViewHTML(productos);
+                                await this.getPopularCategoriesViewHTML(productos); // Las recomendaciones ML ya están integradas en productos
                         }
                         break;
                     case 'tiendas':
@@ -2181,10 +2531,55 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         },
 
-        getFeedProductosHTML(productos) {
+        async getFeedProductosHTML(productos) {
             if (!productos || productos.length === 0) return `<div class="text-center p-10"><i class="fas fa-box-open text-5xl text-slate-300"></i><p class="mt-4 text-slate-500">No hay productos disponibles.</p></div>`;
+            
+            // 🧠 Obtener recomendaciones ML para mostrar discretamente
+            const recomendacionesML = await this.getRecomendacionesML();
+            let recomendacionesMLHTML = '';
+            
+            // 🎯 CREAR SCROLL HORIZONTAL DISCRETO si hay recomendaciones
+            if (recomendacionesML && recomendacionesML.length > 0) {
+                const recomendacionesCards = recomendacionesML.map(rec => `
+                    <div class="min-w-[140px] max-w-[140px] bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mr-3" 
+                         onclick="window.Views.render('detalleProducto', { id: ${rec.productoId} })">>
+                        <div class="relative">
+                            <img src="${rec.imagenProducto || '/images/placeholder.jpg'}" 
+                                 alt="${rec.nombreProducto}" 
+                                 class="w-full h-20 object-cover">
+                        </div>
+                        <div class="p-2">
+                            <h3 class="text-xs font-semibold text-gray-800 mb-1 line-clamp-2">${rec.nombreProducto}</h3>
+                            <p class="text-xs text-gray-500">${rec.nombreTienda}</p>
+                            <p class="text-sm font-bold text-green-600">$${rec.precioProducto || 0}</p>
+                        </div>
+                    </div>
+                `).join('');
+                
+                recomendacionesMLHTML = `
+                    <div class="mb-4">
+                        <!-- Título discreto -->
+                        <h3 class="text-sm font-medium text-gray-700 mb-2 px-3">Para ti</h3>
+                        
+                        <!-- Scroll horizontal -->
+                        <div class="flex overflow-x-auto pb-2 px-3" style="scrollbar-width: none; -ms-overflow-style: none;">
+                            ${recomendacionesCards}
+                        </div>
+                    </div>
+                    <style>
+                        .line-clamp-2 {
+                            display: -webkit-box;
+                            -webkit-line-clamp: 2;
+                            -webkit-box-orient: vertical;
+                            overflow: hidden;
+                        }
+                    </style>
+                `;
+            }
+            
             const categorias = { "Novedades para ti": productos };
-            let html = '';
+            let html = recomendacionesMLHTML; // Agregar ML al principio
+            
             for (const [nombreCat, prodsCat] of Object.entries(categorias)) {
                 html += `<h2 class="text-lg font-bold text-slate-700 mt-4 mb-3 px-3">${nombreCat}</h2>
                 <div class="px-3">
@@ -3057,7 +3452,60 @@ getCarouselTiendasHTML(tiendas) {
         /**
          * 🎆 Vista principal ultra-moderna - Diseño 2024
          */
-        getPopularCategoriesViewHTML(productos) {
+        async getPopularCategoriesViewHTML(productos) {
+            console.log('🧠 INICIO getPopularCategoriesViewHTML');
+            
+            // 🧠 Obtener recomendaciones ML para mostrar discretamente
+            let recomendacionesMLHTML = '';
+            try {
+                const recomendacionesML = await this.getRecomendacionesML();
+                console.log('🎯 Recomendaciones ML obtenidas en vista principal:', recomendacionesML);
+                
+                // 🎯 CREAR SCROLL HORIZONTAL DISCRETO si hay recomendaciones
+                if (recomendacionesML && recomendacionesML.length > 0) {
+                    const recomendacionesCards = recomendacionesML.map(rec => `
+                        <div class="min-w-[140px] max-w-[140px] bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mr-3" 
+                             onclick="window.Views.render('detalleProducto', { id: ${rec.productoId} })">
+                            <div class="relative">
+                                <img src="${rec.imagenProducto || '/images/placeholder.jpg'}" 
+                                     alt="${rec.nombreProducto}" 
+                                     class="w-full h-20 object-cover">
+                            </div>
+                            <div class="p-2">
+                                <h3 class="text-xs font-semibold text-gray-800 mb-1 line-clamp-2">${rec.nombreProducto}</h3>
+                                <p class="text-xs text-gray-500">${rec.nombreTienda}</p>
+                                <p class="text-sm font-bold text-green-600">$${rec.precioProducto || 0}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    recomendacionesMLHTML = `
+                        <div class="mb-4 px-4">
+                            <!-- Título discreto -->
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Para ti</h3>
+                            
+                            <!-- Scroll horizontal -->
+                            <div class="flex overflow-x-auto pb-2" style="scrollbar-width: none; -ms-overflow-style: none;">
+                                ${recomendacionesCards}
+                            </div>
+                        </div>
+                        <style>
+                            .line-clamp-2 {
+                                display: -webkit-box;
+                                -webkit-line-clamp: 2;
+                                -webkit-box-orient: vertical;
+                                overflow: hidden;
+                            }
+                        </style>
+                    `;
+                    console.log('✅ HTML de recomendaciones generado para vista principal');
+                } else {
+                    console.log('⚠️ No hay recomendaciones ML para mostrar en vista principal');
+                }
+            } catch (error) {
+                console.error('❌ Error obteniendo recomendaciones ML en vista principal:', error);
+            }
+            
             if (!productos || productos.length === 0) {
                 return `
                     <div class="flex flex-col items-center justify-center h-64 text-gray-500 mx-4">
@@ -3225,6 +3673,7 @@ getCarouselTiendasHTML(tiendas) {
             
             return `
                 <div id="productos-container">
+                    ${recomendacionesMLHTML}
                     ${html}
                 </div>
             `;
@@ -3488,7 +3937,60 @@ getCarouselTiendasHTML(tiendas) {
         /**
          * 🍔 NUEVA FUNCIÓN: Vista de productos filtrados por categoría
          */
-        getProductosPorCategoriaHTML(productos, categoria) {
+        async getProductosPorCategoriaHTML(productos, categoria) {
+            console.log('🧠 INICIO getProductosPorCategoriaHTML:', categoria);
+            
+            // 🧠 Obtener recomendaciones ML para mostrar discretamente
+            let recomendacionesMLHTML = '';
+            try {
+                const recomendacionesML = await this.getRecomendacionesML();
+                console.log('🎯 Recomendaciones ML obtenidas:', recomendacionesML);
+                
+                // 🎯 CREAR SCROLL HORIZONTAL DISCRETO si hay recomendaciones
+                if (recomendacionesML && recomendacionesML.length > 0) {
+                    const recomendacionesCards = recomendacionesML.map(rec => `
+                        <div class="min-w-[140px] max-w-[140px] bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mr-3" 
+                             onclick="window.Views.render('detalleProducto', { id: ${rec.productoId} })">
+                            <div class="relative">
+                                <img src="${rec.imagenProducto || '/images/placeholder.jpg'}" 
+                                     alt="${rec.nombreProducto}" 
+                                     class="w-full h-20 object-cover">
+                            </div>
+                            <div class="p-2">
+                                <h3 class="text-xs font-semibold text-gray-800 mb-1 line-clamp-2">${rec.nombreProducto}</h3>
+                                <p class="text-xs text-gray-500">${rec.nombreTienda}</p>
+                                <p class="text-sm font-bold text-green-600">$${rec.precioProducto || 0}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                    
+                    recomendacionesMLHTML = `
+                        <div class="mb-4 px-4">
+                            <!-- Título discreto -->
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Para ti</h3>
+                            
+                            <!-- Scroll horizontal -->
+                            <div class="flex overflow-x-auto pb-2" style="scrollbar-width: none; -ms-overflow-style: none;">
+                                ${recomendacionesCards}
+                            </div>
+                        </div>
+                        <style>
+                            .line-clamp-2 {
+                                display: -webkit-box;
+                                -webkit-line-clamp: 2;
+                                -webkit-box-orient: vertical;
+                                overflow: hidden;
+                            }
+                        </style>
+                    `;
+                    console.log('✅ HTML de recomendaciones generado');
+                } else {
+                    console.log('⚠️ No hay recomendaciones ML para mostrar');
+                }
+            } catch (error) {
+                console.error('❌ Error obteniendo recomendaciones ML:', error);
+            }
+            
             // Mapear categorías a iconos y gradientes
             const categoriaInfo = {
                 'Desayuno': { icon: 'fa-coffee', gradient: 'from-amber-400 to-orange-400' },
@@ -3530,6 +4032,7 @@ getCarouselTiendasHTML(tiendas) {
             });
 
             return `
+            ${recomendacionesMLHTML}
             <div class="px-4 pb-4">
                 <!-- Header de categoría -->
                 <div class="bg-gradient-to-r ${info.gradient} rounded-2xl p-4 mb-6 text-white">
@@ -3751,24 +4254,15 @@ getCarouselTiendasHTML(tiendas) {
                 const mainContainer = document.querySelector('#app-container');
                 if (mainContainer) {
                     if (State.categoriaSeleccionada) {
-                        // Mostrar vista compacta filtrada
+                        // 🎯 USAR LA FUNCIÓN QUE INCLUYE ML RECOMMENDATIONS
                         const nombreCategoria = this.getCategoryDisplayName(State.categoriaSeleccionada);
-                        const contenidoFiltrado = `
-                            <div id="productos-container">
-                                <div class="px-4 py-4">
-                                    <h2 class="text-lg font-bold text-gray-800 mb-4">${nombreCategoria} (${productosFiltrados.length})</h2>
-                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                        ${productosFiltrados.map(producto => Views.generateUniversityProductCard(producto)).join('')}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                        const contenidoFiltrado = await this.getProductosPorCategoriaHTML(productosFiltrados, nombreCategoria);
                         mainContainer.innerHTML = this.getCategoryBarHTML() + contenidoFiltrado;
                     } else {
                         // Volver a la vista completa
                         mainContainer.innerHTML = 
                             this.getCategoryBarHTML() +
-                            this.getPopularCategoriesViewHTML(productosFiltrados);
+                            await this.getPopularCategoriesViewHTML(productosFiltrados);
                     }
                 }
                 
@@ -4021,6 +4515,12 @@ getCarouselTiendasHTML(tiendas) {
         },
         
         async enviarPedido() {
+            // 🚨 Validación: Carrito no vacío
+            if (!State.carrito || State.carrito.length === 0) {
+                Toast.show('⚠️ El carrito está vacío', 'error');
+                return;
+            }
+            
             // 🚨 Validación obligatoria: dirección para domicilio
             if (State.tipoEntrega === 'domicilio' && (!State.notasDomicilio || State.notasDomicilio.trim() === '')) {
                 Toast.show('⚠️ La dirección de entrega es obligatoria para domicilio', 'error');
@@ -4031,12 +4531,16 @@ getCarouselTiendasHTML(tiendas) {
             boton.disabled = true;
             boton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i> Procesando...`;
             
+            // 🏪 Obtener tiendaId del primer item del carrito
+            const tiendaId = State.carrito[0].tiendaId;
+            const tiendaNombre = State.carrito[0].tiendaNombre;
+            
             const dto = {
-                tiendaId: State.tiendaActual.id,
+                tiendaId: tiendaId,
                 items: State.carrito.map(item => ({
-                    id: item.productoId,
+                    id: item.productoId, // El backend espera 'id', no 'productoId'
                     cantidad: item.cantidad,
-                    opcionesIds: item.opciones.map(op => op.id)
+                    opcionesIds: item.opciones ? item.opciones.map(op => op.id) : []
                 })),
                 // 🚛 Incluir información de entrega y pago
                 tipoEntrega: State.tipoEntrega,
@@ -4044,6 +4548,8 @@ getCarouselTiendasHTML(tiendas) {
                 notasGenerales: State.notasGenerales || '',
                 notasDomicilio: State.notasDomicilio || ''
             };
+            
+            console.log('🎯 DTO enviado al backend:', dto);
 
             try {
                 const response = await Api.crearPedido(dto);
@@ -4051,14 +4557,14 @@ getCarouselTiendasHTML(tiendas) {
                 // 🎯 ACTUALIZACIÓN INMEDIATA: Crear pedido temporal para la caché
                 const nuevoPedidoTemporal = {
                     id: 'temp-' + Date.now(), // ID temporal
-                    nombreTienda: State.tiendaActual?.nombre || 'Tienda',
-                    total: State.carrito.reduce((sum, item) => sum + item.subtotal, 0),
+                    nombreTienda: tiendaNombre || 'Tienda',
+                    total: State.carrito.reduce((sum, item) => sum + (item.precioFinal || item.precioUnitario * item.cantidad), 0),
                     estado: 'PENDIENTE',
                     fechaCreacion: new Date().toISOString(),
                     items: State.carrito.map(item => ({
-                        id: item.productoId,
+                        id: item.productoId, // Mantener consistencia con el DTO
                         cantidad: item.cantidad,
-                        opcionesIds: item.opciones.map(op => op.id)
+                        opcionesIds: item.opciones ? item.opciones.map(op => op.id) : []
                     })),
                     tipoEntrega: State.tipoEntrega,
                     tipoPago: State.tipoPago,
@@ -4110,7 +4616,17 @@ getCarouselTiendasHTML(tiendas) {
                 }, 2000);
                 
             } catch (error) {
-                Toast.show(`Error: ${error.message}`, 'error');
+                console.error('❌ Error completo al crear pedido:', error);
+                let errorMessage = 'Error al procesar el pedido';
+                
+                // Intentar extraer el mensaje de error del backend
+                if (error.message) {
+                    errorMessage = error.message;
+                } else if (typeof error === 'string') {
+                    errorMessage = error;
+                }
+                
+                Toast.show(`❌ ${errorMessage}`, 'error');
                 boton.disabled = false;
                 boton.innerHTML = 'Confirmar Pedido';
             }

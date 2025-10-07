@@ -20,6 +20,7 @@ import com.remington.unieats.marketplace.model.entity.Producto;
 import com.remington.unieats.marketplace.model.entity.Tienda;
 import com.remington.unieats.marketplace.model.entity.Usuario;
 import com.remington.unieats.marketplace.model.enums.EstadoPedido;
+import com.remington.unieats.marketplace.model.repository.DetallePedidoRepository;
 import com.remington.unieats.marketplace.model.repository.OpcionRepository;
 import com.remington.unieats.marketplace.model.repository.PedidoRepository;
 import com.remington.unieats.marketplace.model.repository.ProductoRepository;
@@ -31,9 +32,9 @@ public class PedidoServiceImpl implements PedidoService {
     @Autowired private PedidoRepository pedidoRepository;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private TiendaRepository tiendaRepository;
-    @Autowired private OpcionRepository opcionRepository; // <-- Asegúrate de tenerlo
-
-    @Override
+    @Autowired private DetallePedidoRepository detallePedidoRepository;
+    @Autowired private OpcionRepository opcionRepository;
+    // @Autowired private MachineLearningService machineLearningService; // 🧠 TEMPORALMENTE DESHABILITADO    @Override
     @Transactional
     public Pedido crearPedido(PedidoDTO pedidoDTO, Usuario comprador) {
         Tienda tienda = tiendaRepository.findById(pedidoDTO.getTiendaId())
@@ -84,7 +85,21 @@ public class PedidoServiceImpl implements PedidoService {
         nuevoPedido.setDetalles(detalles);
         nuevoPedido.setTotal(totalPedido); // Guardamos el total correcto
 
-        return pedidoRepository.save(nuevoPedido);
+        // 💾 Guardar el pedido en la base de datos
+        Pedido pedidoGuardado = pedidoRepository.save(nuevoPedido);
+        
+        // 🧠 INTEGRACIÓN ML: TEMPORALMENTE DESHABILITADO PARA DEPURAR
+        /*
+        try {
+            machineLearningService.registrarComportamientoCompra(pedidoGuardado);
+        } catch (Exception e) {
+            // ML no debe fallar el pedido - solo registrar el error
+            System.err.println("⚠️ Error en ML al registrar comportamiento (no crítico): " + e.getMessage());
+            e.printStackTrace();
+        }
+        */
+
+        return pedidoGuardado;
     }
 
     @Override

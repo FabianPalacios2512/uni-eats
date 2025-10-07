@@ -40,3 +40,14 @@ src/main/resources/application-local.properties
 ### Archivos temporales ###
 *.log
 *.tmp
+nohup.out
+server.log
+app.log
+spring-boot.log
+
+### Scripts de prueba ###
+*.sh
+test_*.sh
+
+### Directorios temporales ###
+.github/java-upgrade/

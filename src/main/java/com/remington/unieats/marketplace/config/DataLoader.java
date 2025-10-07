@@ -2,15 +2,20 @@ package com.remington.unieats.marketplace.config;
 
 import com.remington.unieats.marketplace.model.entity.*;
 import com.remington.unieats.marketplace.model.repository.*;
+import com.remington.unieats.marketplace.repository.UsuarioComportamientoRepository;
+import com.remington.unieats.marketplace.entity.UsuarioComportamiento;
 import com.remington.unieats.marketplace.model.enums.EstadoTienda;
+import com.remington.unieats.marketplace.model.enums.ClasificacionProducto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.List;
+import java.util.Random;
 
 @Component
 @Profile("!test") // No ejecutar en tests
@@ -22,6 +27,7 @@ public class DataLoader implements CommandLineRunner {
     @Autowired private UsuarioRepository usuarioRepository;
     @Autowired private TiendaRepository tiendaRepository;
     @Autowired private ProductoRepository productoRepository;
+    @Autowired private UsuarioComportamientoRepository usuarioComportamientoRepository;
     @Autowired private PasswordEncoder passwordEncoder;
 
     @Override
@@ -29,29 +35,40 @@ public class DataLoader implements CommandLineRunner {
         logger.info("🚀 DataLoader iniciado...");
         
         try {
-            // Solo ejecutar si la base de datos está vacía
-            if (rolRepository.count() > 0) {
-                logger.info("ℹ️ Base de datos ya inicializada, saltando DataLoader");
-                return;
+            // Verificar si necesitamos datos básicos
+            boolean baseDatosVacia = rolRepository.count() == 0;
+            
+            if (baseDatosVacia) {
+                // 1. Crear roles
+                crearRoles();
+                
+                // 2. Crear usuarios administrador y estudiante
+                crearUsuariosBase();
+                
+                // 4. Crear 6 tiendas con sus vendedores
+                crearTiendasCompletas();
+                
+                // 5. Crear productos para cada tienda
+                crearProductos();
+                
+                logger.info("✅ Datos básicos creados exitosamente");
+            } else {
+                logger.info("ℹ️ Base de datos ya tiene datos básicos");
             }
             
-            // 1. Crear roles
-            crearRoles();
+            // 🧠 SIEMPRE verificar y crear usuarios especializados para ML
+            crearUsuariosEspecializados();
             
-            // 2. Crear usuarios administrador y estudiante
-            crearUsuariosBase();
-            
-            // 3. Crear 6 tiendas con sus vendedores
-            crearTiendasCompletas();
-            
-            // 4. Crear productos para cada tienda
-            crearProductos();
+            // 🧠 SIEMPRE verificar y crear comportamientos ML para usuarios especializados
+            crearComportamientosML();
             
             logger.info("✅ DataLoader completado exitosamente");
             logger.info("🎯 Sistema listo para usar con datos de prueba completos");
             logger.info("🔑 Credenciales de prueba:");
             logger.info("   👨‍💼 Admin: admin@unieats.com / admin123");
             logger.info("   🎓 Estudiante: estudiante@unieats.com / estudiante123");
+            logger.info("   🥤 Bebidas ML: bebidas@unieats.com / bebidas123");
+            logger.info("   🍽️ Almuerzo ML: almuerzo@unieats.com / almuerzo123");
             logger.info("   🏪 Vendedores: tienda1@gmail.com a tienda6@gmail.com / vendedor123");
             
         } catch (Exception e) {
@@ -248,5 +265,180 @@ public class DataLoader implements CommandLineRunner {
 
     private String generarNit() {
         return String.valueOf(900000000L + (long)(Math.random() * 100000000L));
+    }
+    
+    // 🧠 === NUEVAS FUNCIONES PARA MACHINE LEARNING === 🧠
+    
+    /**
+     * Crea dos usuarios especializados con preferencias muy diferentes:
+     * - Usuario "Bebidas": Solo consume bebidas y postres
+     * - Usuario "Almuerzo": Solo consume almuerzos y comida fuerte
+     */
+    private void crearUsuariosEspecializados() {
+        logger.info("🧠 Creando usuarios especializados para ML...");
+        
+        Rol estudianteRol = rolRepository.findByNombre("ESTUDIANTE").orElseThrow();
+        
+        // 🥤 Usuario especializado en BEBIDAS
+        if (usuarioRepository.findByCorreo("bebidas@unieats.com").isEmpty()) {
+            Usuario usuarioBebidas = new Usuario();
+            usuarioBebidas.setNombre("María Elena");
+            usuarioBebidas.setApellido("Café López");
+            usuarioBebidas.setCorreo("bebidas@unieats.com");
+            usuarioBebidas.setCedula("1111111111");
+            usuarioBebidas.setContrasenaHash(passwordEncoder.encode("bebidas123"));
+            usuarioBebidas.setActivo(true);
+            usuarioBebidas.setRoles(Set.of(estudianteRol));
+            usuarioRepository.save(usuarioBebidas);
+            logger.info("✅ Usuario especializado en BEBIDAS creado: bebidas@unieats.com / bebidas123");
+        }
+
+        // 🍽️ Usuario especializado en ALMUERZOS
+        if (usuarioRepository.findByCorreo("almuerzo@unieats.com").isEmpty()) {
+            Usuario usuarioAlmuerzo = new Usuario();
+            usuarioAlmuerzo.setNombre("Carlos Alberto");
+            usuarioAlmuerzo.setApellido("Comida Fuerte");
+            usuarioAlmuerzo.setCorreo("almuerzo@unieats.com");
+            usuarioAlmuerzo.setCedula("2222222222");
+            usuarioAlmuerzo.setContrasenaHash(passwordEncoder.encode("almuerzo123"));
+            usuarioAlmuerzo.setActivo(true);
+            usuarioAlmuerzo.setRoles(Set.of(estudianteRol));
+            usuarioRepository.save(usuarioAlmuerzo);
+            logger.info("✅ Usuario especializado en ALMUERZOS creado: almuerzo@unieats.com / almuerzo123");
+        }
+    }
+    
+    /**
+     * Crea comportamientos ML simulados para entrenar el sistema
+     */
+    private void crearComportamientosML() {
+        logger.info("🧠 Creando comportamientos ML especializados...");
+        
+        try {
+            Usuario usuarioBebidas = usuarioRepository.findByCorreo("bebidas@unieats.com").orElse(null);
+            Usuario usuarioAlmuerzo = usuarioRepository.findByCorreo("almuerzo@unieats.com").orElse(null);
+            
+            if (usuarioBebidas == null || usuarioAlmuerzo == null) {
+                logger.warn("⚠️ No se encontraron usuarios especializados, saltando creación de comportamientos ML");
+                return;
+            }
+            
+            // 🥤 Crear comportamientos para usuario BEBIDAS (15-20 interacciones)
+            crearComportamientosBebidas(usuarioBebidas);
+            
+            // 🍽️ Crear comportamientos para usuario ALMUERZOS (15-20 interacciones)
+            crearComportamientosAlmuerzos(usuarioAlmuerzo);
+            
+            logger.info("✅ Comportamientos ML creados exitosamente");
+            
+        } catch (Exception e) {
+            logger.error("❌ Error creando comportamientos ML: {}", e.getMessage());
+        }
+    }
+    
+    private void crearComportamientosBebidas(Usuario usuario) {
+        logger.info("🥤 Creando comportamientos especializados en BEBIDAS para usuario: {}", usuario.getCorreo());
+        
+        // Obtener productos de bebidas y postres
+        List<Producto> productosBebidas = productoRepository.findAll().stream()
+            .filter(p -> p.getClasificacion() == ClasificacionProducto.BEBIDAS)
+            .toList();
+            
+        List<Producto> productosPostres = productoRepository.findAll().stream()
+            .filter(p -> p.getClasificacion() == ClasificacionProducto.POSTRES)
+            .toList();
+        
+        Random random = new Random();
+        
+        // Crear 12-15 comportamientos de BEBIDAS (alta frecuencia)
+        for (int i = 0; i < 14; i++) {
+            if (!productosBebidas.isEmpty()) {
+                Producto producto = productosBebidas.get(random.nextInt(productosBebidas.size()));
+                crearComportamiento(usuario, producto, random.nextInt(5) + 3); // Frecuencia 3-7
+            }
+        }
+        
+        // Crear 3-5 comportamientos de POSTRES (frecuencia media)
+        for (int i = 0; i < 4; i++) {
+            if (!productosPostres.isEmpty()) {
+                Producto producto = productosPostres.get(random.nextInt(productosPostres.size()));
+                crearComportamiento(usuario, producto, random.nextInt(3) + 2); // Frecuencia 2-4
+            }
+        }
+        
+        logger.info("✅ {} comportamientos de BEBIDAS creados", 18);
+    }
+    
+    private void crearComportamientosAlmuerzos(Usuario usuario) {
+        logger.info("🍽️ Creando comportamientos especializados en ALMUERZOS para usuario: {}", usuario.getCorreo());
+        
+        // Obtener productos de almuerzo y comida rápida
+        List<Producto> productosAlmuerzo = productoRepository.findAll().stream()
+            .filter(p -> p.getClasificacion() == ClasificacionProducto.ALMUERZO)
+            .toList();
+            
+        List<Producto> productosComidaRapida = productoRepository.findAll().stream()
+            .filter(p -> p.getClasificacion() == ClasificacionProducto.COMIDA_RAPIDA)
+            .toList();
+            
+        List<Producto> productosSaludable = productoRepository.findAll().stream()
+            .filter(p -> p.getClasificacion() == ClasificacionProducto.SALUDABLE)
+            .toList();
+        
+        Random random = new Random();
+        
+        // Crear 10-12 comportamientos de ALMUERZO (alta frecuencia)
+        for (int i = 0; i < 11; i++) {
+            if (!productosAlmuerzo.isEmpty()) {
+                Producto producto = productosAlmuerzo.get(random.nextInt(productosAlmuerzo.size()));
+                crearComportamiento(usuario, producto, random.nextInt(4) + 4); // Frecuencia 4-7
+            }
+        }
+        
+        // Crear 4-6 comportamientos de COMIDA_RAPIDA (frecuencia media)
+        for (int i = 0; i < 5; i++) {
+            if (!productosComidaRapida.isEmpty()) {
+                Producto producto = productosComidaRapida.get(random.nextInt(productosComidaRapida.size()));
+                crearComportamiento(usuario, producto, random.nextInt(3) + 2); // Frecuencia 2-4
+            }
+        }
+        
+        // Crear 2-3 comportamientos de SALUDABLE (frecuencia baja)
+        for (int i = 0; i < 2; i++) {
+            if (!productosSaludable.isEmpty()) {
+                Producto producto = productosSaludable.get(random.nextInt(productosSaludable.size()));
+                crearComportamiento(usuario, producto, random.nextInt(2) + 1); // Frecuencia 1-2
+            }
+        }
+        
+        logger.info("✅ {} comportamientos de ALMUERZOS creados", 18);
+    }
+    
+    private void crearComportamiento(Usuario usuario, Producto producto, int frecuencia) {
+        try {
+            UsuarioComportamiento comportamiento = new UsuarioComportamiento();
+            comportamiento.setUsuarioId(usuario.getId());
+            comportamiento.setProductoId(producto.getId());
+            comportamiento.setNombreProducto(producto.getNombre());
+            comportamiento.setCategoriaProducto(producto.getClasificacion().toString());
+            comportamiento.setTiendaId(producto.getTienda().getId());
+            comportamiento.setNombreTienda(producto.getTienda().getNombre());
+            comportamiento.setFrecuenciaCompra(frecuencia);
+            comportamiento.setTotalGastado(producto.getPrecio().multiply(BigDecimal.valueOf(frecuencia)));
+            comportamiento.setPromedioCantidad(BigDecimal.valueOf(frecuencia / 2.0));
+            comportamiento.setEsFavorito(frecuencia > 5);
+            comportamiento.setPuntuacionAfinidad(BigDecimal.valueOf(frecuencia * 10.0));
+            comportamiento.setHoraPreferidaCompra(12); // Hora del almuerzo por defecto
+            comportamiento.setUltimaCompra(LocalDateTime.now().minusDays(1));
+            comportamiento.setFechaCreacion(LocalDateTime.now());
+            comportamiento.setFechaActualizacion(LocalDateTime.now());
+            
+            usuarioComportamientoRepository.save(comportamiento);
+            
+            logger.debug("🔄 Comportamiento creado: Usuario {}, Producto {} ({}), Frecuencia: {}", 
+                usuario.getId(), producto.getNombre(), producto.getClasificacion(), frecuencia);
+        } catch (Exception e) {
+            logger.warn("⚠️ Error creando comportamiento para producto {}: {}", producto.getNombre(), e.getMessage());
+        }
     }
 }

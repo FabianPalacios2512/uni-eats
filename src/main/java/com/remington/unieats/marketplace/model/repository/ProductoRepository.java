@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.remington.unieats.marketplace.model.entity.Producto;
 import com.remington.unieats.marketplace.model.entity.Tienda;
 import com.remington.unieats.marketplace.model.enums.EstadoTienda;
+import com.remington.unieats.marketplace.model.enums.ClasificacionProducto;
 
 @Repository
 public interface ProductoRepository extends JpaRepository<Producto, Integer> {
@@ -28,4 +29,10 @@ public interface ProductoRepository extends JpaRepository<Producto, Integer> {
     
     List<Producto> findByNombreContainingIgnoreCaseAndTienda_EstadoAndTienda_EstaAbiertaAndDisponible(
         String nombre, EstadoTienda estado, Boolean estaAbierta, boolean disponible);
+    
+    // MÉTODOS PARA ML - MACHINE LEARNING
+    List<Producto> findByClasificacionAndDisponibleTrue(ClasificacionProducto clasificacion);
+    
+    List<Producto> findByClasificacionAndTienda_EstadoAndTienda_EstaAbiertaAndDisponibleTrue(
+        ClasificacionProducto clasificacion, EstadoTienda estado, Boolean estaAbierta);
 }

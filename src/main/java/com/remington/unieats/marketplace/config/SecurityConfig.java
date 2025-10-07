@@ -30,6 +30,11 @@ public class SecurityConfig {
                     "/img/**",
                     "/uploads/**",
                     "/api/marketplace/**", // Permitimos ver tiendas sin iniciar sesión
+                    "/api/auth/**", // ✅ Permitir endpoints de autenticación (login/register) sin autenticación
+                    "/api/recomendaciones/health", // ✅ Permitir health check ML sin autenticación
+                    "/api/ml-monitor/test-recomendaciones/**", // ✅ Permitir endpoint de test ML
+                    "/api/ml-monitor/test-minimo/**", // ✅ Permitir endpoint de test mínimo
+                    "/api/ml-monitor/recomendaciones/**", // ✅ Permitir endpoint de recomendaciones ML
                     "/error/**", // Permitir páginas de error
                     "/custom-logout" // Permitir logout personalizado
                 ).permitAll()
@@ -56,7 +61,7 @@ public class SecurityConfig {
 
         // ↓↓↓ CONFIGURACIÓN CSRF PARA SOLUCIONAR ERROR 403 EN LOGOUT ↓↓↓
         http.csrf(csrf -> csrf
-            .ignoringRequestMatchers("/api/**", "/logout", "/custom-logout") // Deshabilita CSRF para API y logout
+            .ignoringRequestMatchers("/api/**", "/logout", "/custom-logout", "/login") // Deshabilita CSRF para API, logout y login
         );
 
         return http.build();
