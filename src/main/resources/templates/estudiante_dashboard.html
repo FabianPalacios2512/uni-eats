@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Uni-Eats</title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.6s ease-out forwards',
+                        'shimmer': 'shimmer 2s ease-in-out infinite',
+                        'float': 'float 3s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite',
+                        'bounce-subtle': 'bounceSubtle 2s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' }
+                        },
+                        shimmer: {
+                            '0%': { transform: 'translateX(-100%)' },
+                            '100%': { transform: 'translateX(100%)' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        glow: {
+                            '0%, 100%': { boxShadow: '0 0 20px rgba(168, 85, 247, 0.4)' },
+                            '50%': { boxShadow: '0 0 40px rgba(168, 85, 247, 0.6)' }
+                        },
+                        bounceSubtle: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-5px)' }
+                        }
+                    },
+                    backdropBlur: {
+                        'xs': '2px',
+                        'sm': '4px',
+                        'md': '8px',
+                        'lg': '12px',
+                        'xl': '16px',
+                        '2xl': '20px',
+                        '3xl': '24px'
+                    },
+                    scale: {
+                        '102': '1.02'
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/modern-effects.css">
+    
+    <style>
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden; /* Prevenir scroll horizontal */
+            max-width: 100vw; /* Limitar ancho máximo */
+        }
+        /* Prevenir scroll horizontal en todos los elementos */
+        * {
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        /* Ocultar scrollbars en carruseles */
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        /* Estilo para navegación activa con tema teal/emerald */
+        .nav-link.active i, .nav-link.active span { color: #14b8a6; /* teal-500 */ }
+        .nav-link.active .w-9 { background: linear-gradient(to right, #14b8a6, #10b981); /* teal-500 to emerald-500 */ }
+        .skeleton { animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; background-color: #e5e7eb; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+        .line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; }
+        .line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+        .qty-btn { width: 2.5rem; height: 2.5rem; border-radius: 9999px; background-color: #f1f5f9; font-weight: bold; font-size: 1.25rem; color: #14b8a6; }
+        .profile-link { display: flex; align-items: center; padding: 1rem; border-bottom-width: 1px; }
+        .profile-link:hover { background-color: #f8fafc; }
+        .profile-icon { width: 2rem; text-align: center; }
+        .producto-card { display: flex; align-items: center; gap: 1rem; background-color: white; padding: 0.75rem; border-radius: 0.75rem; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1); }
+        .add-to-cart-btn { flex-shrink: 0; width: 2.5rem; height: 2.5rem; border-radius: 9999px; background-color: #ccfbf1; color: #0f766e; font-size: 1.25rem; font-weight: bold; transition: transform 0.1s; }
+        .add-to-cart-btn:active { transform: scale(0.9); }
+        .cart-qty-btn { width: 2rem; height: 2rem; border-radius: 9999px; background-color: #f1f5f9; font-weight: bold; color: #14b8a6; }
+        @keyframes pop-in { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .animate-pop-in { animation: pop-in 0.3s ease-out forwards; }
+        @keyframes slide-down { from { transform: translate(-50%, -100%); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+        .animate-slide-down { animation: slide-down 0.4s ease-out forwards; }
+        @keyframes fade-out { to { opacity: 0; } }
+        .animate-fade-out { animation: fade-out 0.3s ease-in forwards; }
+        
+        /* 🎨 NUEVAS ANIMACIONES PARA EL SISTEMA INTELIGENTE */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn { animation: fadeIn 0.6s ease-out forwards; }
+        
+        @keyframes slideInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slideInUp { animation: slideInUp 0.5s ease-out forwards; }
+        
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.4); }
+            50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.8), 0 0 30px rgba(99, 102, 241, 0.4); }
+        }
+        .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+        
+        /* 📱 NAVEGACIÓN FIJA MOBILE */
+        #app-nav {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 99999 !important;
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border-top: 1px solid #e5e7eb !important;
+            padding-bottom: env(safe-area-inset-bottom, 2px) !important;
+            box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1) !important;
+        }
+        
+        /* Espacio para el contenido para que no se oculte detrás del nav */
+        #app-container {
+            padding-bottom: 60px !important; /* Altura del nav + margen extra reducido */
+            min-height: calc(100vh - 60px) !important;
+        }
+        
+        /* Ajuste del contenedor principal */
+        body .bg-gradient-to-br {
+            padding-bottom: 0 !important;
+        }
+        
+        /* En móviles, ajustar para navegación */
+        @media (display-mode: standalone) {
+            #app-nav {
+                padding-bottom: calc(2px + env(safe-area-inset-bottom, 0px)) !important;
+            }
+            #app-container {
+                padding-bottom: calc(50px + env(safe-area-inset-bottom, 0px)) !important;
+                min-height: calc(100vh - 50px - env(safe-area-inset-bottom, 0px)) !important;
+            }
+        }
+
+        /* 📱 PWA STANDALONE STYLES */
+        .pwa-standalone {
+            /* Optimizar para modo PWA standalone */
+            isolation: isolate;
+        }
+        
+        .pwa-standalone body {
+            /* Optimizar para pantalla completa */
+            overflow-x: hidden;
+            user-select: none; /* Prevenir selección accidental */
+            -webkit-user-select: none;
+            -webkit-touch-callout: none; /* Prevenir menú contextual en iOS */
+        }
+        
+        .pwa-standalone #app-header {
+            /* Header más prominente en PWA */
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(20px) !important;
+        }
+        
+        .pwa-standalone #app-nav {
+            /* Navegación más nativa en PWA */
+            background: rgba(255, 255, 255, 0.98) !important;
+            backdrop-filter: blur(20px) !important;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        /* Transiciones suaves para PWA */
+        .pwa-standalone * {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        @media (display-mode: standalone) {
+            /* Estilos automáticos cuando está en modo standalone */
+            body {
+                background-color: #ffffff !important;
+            }
+            
+            #app-header {
+                padding-top: env(safe-area-inset-top, 20px) !important;
+            }
+            
+            /* Ocultar elementos del navegador si aparecen */
+            body::before {
+                content: '';
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: env(safe-area-inset-top, 0px);
+                background: #4f46e5;
+                z-index: 9999;
+            }
+        }
+
+        /* Forzar modo app */
+        body[data-app-mode="standalone"] {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+        }
+        
+        body[data-app-mode="standalone"] #app-header {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 1000 !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+
+    <div class="w-full bg-gradient-to-br from-gray-50 via-slate-50 to-gray-100 min-h-screen">
+        <header id="app-header" class="sticky top-0 bg-white/95 backdrop-blur-xl shadow-md z-20 border-b border-gray-200">
+            <!-- Header content will be managed by JavaScript -->
+        </header>
+        <main id="app-container" class="px-1 pt-1"></main>
+    </div>
+
+    <nav id="app-nav" class="flex justify-around shadow-lg py-0.5 bg-white/95 backdrop-blur-xl">
+        <a href="#" class="nav-link active flex flex-col items-center justify-center w-full py-0 relative group" data-view="inicio">
+            <div class="w-5 h-5 bg-gradient-to-r from-teal-500 to-emerald-500 rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                <i class="fas fa-home text-white text-xs"></i>
+            </div>
+            <span class="text-xs text-teal-600 font-semibold mt-0.5 group-hover:text-teal-700 transition-colors">Inicio</span>
+        </a>
+        <a href="#" class="nav-link flex flex-col items-center justify-center w-full py-0 relative group" data-view="tiendas">
+            <div class="w-5 h-5 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-cyan-500 group-hover:to-blue-500 transition-all shadow-md group-hover:scale-110">
+                <i class="fas fa-store text-gray-500 text-xs group-hover:text-white transition-colors"></i>
+            </div>
+            <span class="text-xs text-gray-600 font-semibold mt-0.5 group-hover:text-cyan-600 transition-colors">Tiendas</span>
+        </a>
+        <a href="#" class="nav-link flex flex-col items-center justify-center w-full py-0 relative group" data-view="misPedidos">
+            <div class="w-5 h-5 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gradient-to-r group-hover:from-purple-500 group-hover:to-pink-500 transition-all shadow-md group-hover:scale-110">
+                <i class="fas fa-receipt text-gray-500 text-xs group-hover:text-white transition-colors"></i>
+            </div>
+            <span class="text-xs text-gray-600 font-semibold mt-0.5 group-hover:text-purple-600 transition-colors">Pedidos</span>
+        </a>
+    </nav>
+    
+    <!-- Main App Script -->
+    <script th:src="@{/js/comprador.js}"></script>
+    <!-- Modern Effects Script -->
+    <script th:src="@{/js/modern-effects.js}"></script>
+
+    <script>
+        // Dashboard functionality for students
+        document.addEventListener('DOMContentLoaded', function() {
+            // Agregar indicador de conexión
+            const nav = document.getElementById('app-nav');
+            if (nav) {
+                const connectionIndicator = document.createElement('div');
+                connectionIndicator.innerHTML = `
+                    <i class="fas fa-wifi network-status-icon text-green-500 text-xs"></i>
+                `;
+                connectionIndicator.className = 'absolute top-1 right-2 z-50';
+                nav.style.position = 'relative';
+                nav.appendChild(connectionIndicator);
+            }
+
+            // Pull-to-refresh mejorado - Menos sensible y mejor UX
+            let startY = 0;
+            let pullDistance = 0;
+            let isRefreshing = false;
+            let touchStartTime = 0;
+            const container = document.getElementById('app-container');
+            const PULL_THRESHOLD = 120; // Aumentado de 60 a 120px
+            const MIN_PULL_SPEED = 0.5; // Velocidad mínima requerida
+            
+            if (container) {
+                container.addEventListener('touchstart', (e) => {
+                    // Solo si estamos en el tope de la página
+                    if (window.scrollY === 0 && !isRefreshing) {
+                        startY = e.touches[0].clientY;
+                        touchStartTime = Date.now();
+                    }
+                }, { passive: true });
+
+                container.addEventListener('touchmove', (e) => {
+                    if (isRefreshing || startY === 0) return;
+                    
+                    const currentY = e.touches[0].clientY;
+                    pullDistance = currentY - startY;
+                    const touchDuration = Date.now() - touchStartTime;
+                    const pullSpeed = pullDistance / touchDuration;
+                    
+                    // Solo activar si:
+                    // 1. Estamos en el tope de la página
+                    // 2. Movimiento hacia abajo
+                    // 3. Velocidad mínima de arrastre
+                    if (pullDistance > 20 && window.scrollY === 0 && pullSpeed > MIN_PULL_SPEED) {
+                        // Solo prevenir scroll si realmente queremos hacer pull-to-refresh
+                        if (pullDistance > 40) {
+                            e.preventDefault();
+                        }
+                        
+                        // Visual feedback más suave
+                        if (pullDistance > 80) {
+                            const progress = Math.min((pullDistance - 80) / (PULL_THRESHOLD - 80), 1);
+                            const translateY = Math.min(pullDistance * 0.2, 25);
+                            document.body.style.transform = `translateY(${translateY}px)`;
+                            document.body.style.transition = 'transform 0.1s ease-out';
+                            
+                            // Indicador visual de que se puede hacer refresh
+                            if (pullDistance > PULL_THRESHOLD) {
+                                document.body.style.filter = 'brightness(1.1)';
+                            }
+                        }
+                    }
+                }, { passive: false });
+
+                container.addEventListener('touchend', () => {
+                    if (isRefreshing) return;
+                    
+                    const touchDuration = Date.now() - touchStartTime;
+                    const pullSpeed = pullDistance / touchDuration;
+                    
+                    // Trigger refresh solo con condiciones estrictas
+                    if (pullDistance > PULL_THRESHOLD && 
+                        window.scrollY === 0 && 
+                        pullSpeed > MIN_PULL_SPEED &&
+                        touchDuration > 200) { // Mínimo 200ms de duración
+                        
+                        isRefreshing = true;
+                        
+                        // Feedback visual de carga
+                        document.body.style.transform = 'translateY(15px)';
+                        document.body.style.transition = 'transform 0.3s ease-out';
+                        document.body.style.filter = 'brightness(1.2)';
+                        
+                        // Mostrar indicador de carga
+                        const loadingIndicator = document.createElement('div');
+                        loadingIndicator.id = 'pull-refresh-loader';
+                        loadingIndicator.innerHTML = `
+                            <div class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg z-50 flex items-center">
+                                <svg class="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Actualizando...
+                            </div>
+                        `;
+                        document.body.appendChild(loadingIndicator);
+                        
+                        // Delay antes del refresh para mejor UX
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }
+                    
+                    // Reset suave
+                    document.body.style.transition = 'transform 0.3s ease-out, filter 0.3s ease-out';
+                    document.body.style.transform = '';
+                    document.body.style.filter = '';
+                    
+                    // Limpiar estado
+                    setTimeout(() => {
+                        document.body.style.transition = '';
+                        pullDistance = 0;
+                        startY = 0;
+                        touchStartTime = 0;
+                    }, 300);
+                }, { passive: true });
+            }
+        });
+    </script>
+</body>
+</html>
