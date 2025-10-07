@@ -43,7 +43,7 @@ public class VendedorServiceImpl implements VendedorService {
     @Autowired private PedidoRepository pedidoRepository;
     @Autowired private ProductoRepository productoRepository;
     @Autowired private CategoriaOpcionRepository categoriaOpcionRepository;
-    @Autowired private LocalImageService localImageService;
+    @Autowired private ImageService imageService; // 🔄 Usando ImageService híbrido
 
     @Override
     public Optional<Tienda> findTiendaByVendedor(Usuario vendedor) {
@@ -64,7 +64,7 @@ public class VendedorServiceImpl implements VendedorService {
 
         if (logoFile != null && !logoFile.isEmpty()) {
             try {
-                String logoUrl = localImageService.uploadImage(logoFile, "logos");
+                String logoUrl = imageService.uploadImage(logoFile, "logos");
                 nuevaTienda.setLogoUrl(logoUrl);
             } catch (Exception e) {
                 throw new RuntimeException("Error al subir logo: " + e.getMessage(), e);
@@ -93,9 +93,9 @@ public class VendedorServiceImpl implements VendedorService {
             try {
                 // Eliminar logo anterior si existe
                 if (tienda.getLogoUrl() != null && !tienda.getLogoUrl().isEmpty()) {
-                    localImageService.deleteImage(tienda.getLogoUrl());
+                    imageService.deleteImage(tienda.getLogoUrl());
                 }
-                String logoUrl = localImageService.uploadImage(logoFile, "logos");
+                String logoUrl = imageService.uploadImage(logoFile, "logos");
                 tienda.setLogoUrl(logoUrl);
             } catch (Exception e) {
                 throw new RuntimeException("Error al actualizar logo: " + e.getMessage(), e);

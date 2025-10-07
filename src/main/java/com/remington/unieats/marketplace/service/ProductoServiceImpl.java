@@ -19,7 +19,7 @@ public class ProductoServiceImpl implements ProductoService {
     private ProductoRepository productoRepository;
 
     @Autowired
-    private LocalImageService localImageService;
+    private ImageService imageService; // 🔄 Usando ImageService híbrido
 
     @Override
     public List<Producto> findByTienda(Tienda tienda) {
@@ -34,8 +34,8 @@ public class ProductoServiceImpl implements ProductoService {
                 throw new RuntimeException("La clasificación del producto es obligatoria");
             }
             
-            // 1. Subir la imagen usando almacenamiento local
-            String imagenUrl = localImageService.uploadImage(imagenFile, "productos");
+            // 1. Subir la imagen usando almacenamiento híbrido (Supabase + Local)
+            String imagenUrl = imageService.uploadImage(imagenFile, "productos");
 
             // 2. Crear la nueva entidad Producto
             Producto nuevoProducto = new Producto();
@@ -82,10 +82,10 @@ public class ProductoServiceImpl implements ProductoService {
             if (imagenFile != null && !imagenFile.isEmpty()) {
                 // Eliminar la imagen anterior si existe
                 if (producto.getImagenUrl() != null && !producto.getImagenUrl().isEmpty()) {
-                    localImageService.deleteImage(producto.getImagenUrl());
+                    imageService.deleteImage(producto.getImagenUrl());
                 }
                 // Subir la nueva imagen
-                String nuevaImagenUrl = localImageService.uploadImage(imagenFile, "productos");
+                String nuevaImagenUrl = imageService.uploadImage(imagenFile, "productos");
                 producto.setImagenUrl(nuevaImagenUrl);
             }
 

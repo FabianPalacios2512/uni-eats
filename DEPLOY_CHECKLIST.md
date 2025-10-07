@@ -10,13 +10,22 @@
 
 ### Variables de Entorno Requeridas en Render
 ```
+# Base de Datos PostgreSQL
 DATABASE_URL=postgresql://usuario:password@host:puerto/database
 DATABASE_USERNAME=tu_usuario
 DATABASE_PASSWORD=tu_password
 DATABASE_DRIVER=org.postgresql.Driver
 DATABASE_PLATFORM=org.hibernate.dialect.PostgreSQLDialect
+
+# Configuración del Servidor
 PORT=10000
 UPLOAD_DIR=/tmp/uploads
+
+# 🗄️ Supabase Storage (Recomendado para producción)
+SUPABASE_URL=https://tu-proyecto.supabase.co
+SUPABASE_ANON_KEY=tu_anon_key_aqui
+SUPABASE_BUCKET=uni-eats-images
+SUPABASE_STORAGE_ENABLED=true
 ```
 
 ### Funcionalidades Implementadas
@@ -25,9 +34,10 @@ UPLOAD_DIR=/tmp/uploads
 - [x] Catálogo de tiendas y productos
 - [x] Sistema de pedidos funcional
 - [x] **Sistema de Machine Learning** - ¡Recomendaciones personalizadas!
+- [x] **Almacenamiento híbrido de imágenes** - Supabase Storage + Local fallback
 - [x] Panel de administración
 - [x] Dashboard de vendedores
-- [x] Subida de imágenes
+- [x] Subida de imágenes con CDN global
 - [x] Filtros y búsqueda
 
 ### Sistema ML - Características Destacadas
@@ -50,8 +60,13 @@ UPLOAD_DIR=/tmp/uploads
    - Build Command: `./mvnw clean package -DskipTests`
    - Start Command: `java -Dspring.profiles.active=render -jar target/*.jar`
 3. **Variables de Entorno**: Configurar las variables listadas arriba
-4. **Base de Datos**: Crear PostgreSQL database en Render o usar externa
-5. **Deploy**: ¡Realizar el despliegue!
+4. **🗄️ Configurar Supabase Storage** (RECOMENDADO):
+   - Seguir la guía en `SUPABASE_STORAGE_GUIDE.md`
+   - Crear proyecto en supabase.com
+   - Configurar bucket público `uni-eats-images`
+   - Agregar variables SUPABASE_* en Render
+5. **Base de Datos**: Crear PostgreSQL database en Render o usar externa
+6. **Deploy**: ¡Realizar el despliegue!
 
 ## 🎯 URLs Importantes Post-Despliegue
 - `/` - Página principal del marketplace
