@@ -1,12 +1,15 @@
 package com.remington.unieats.marketplace.controller;
 
-import com.remington.unieats.marketplace.service.ImageService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-
 import java.util.HashMap;
 import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.remington.unieats.marketplace.service.ImageService;
 
 /**
  * 📊 Controlador para verificar el estado del almacenamiento de imágenes
